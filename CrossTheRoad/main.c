@@ -8,7 +8,7 @@ static float animation_ongoing = 0;
 static float animation_parameter = 0;
 
 const static float size = 0.2; // velicina pileta
-const static float vector = 0.3; // velicina za koju se pile krece
+const static float vector = 0.2; // velicina za koju se pile krece
 static char side; // pravac i smer u kom se pomera pile (l || r || f || b)
 static char current_step = 0; // trenutni potez koji je ucinjen - treba nam zbog rotacije pileta kad se krece u stranu
 
@@ -26,10 +26,11 @@ static void on_keyboard_for_arrows(int key, int x, int y); // osluskivac za stre
 static void initialize(void);
 static void jumpCheck(unsigned char m); // funkcija koja proverava da li je moguce kretanje u zadatom pravcu
 static void checkAndStartTimer(); // funkcija koja pokrece tajmer na prvi dodir nekog od tastera za kretanje
-void drawChicken(); // funkcija za crtanje pileta
+static void drawChicken(); // funkcija za crtanje pileta
 static void rotateChicken(char current_step); // funkcija koja rotira pile kad pri promeni pravca ili smera kretanja
+static void drawTree(); // funkcija koja crta drvo
+static void drawCar(); // funkcija koja crta automobil
 
-#define TIMER_INTERVAL 20
 #define TIMER_ID 0
 
 int main(int argc, char** argv){
@@ -46,7 +47,7 @@ int main(int argc, char** argv){
     glutKeyboardFunc(on_keyboard);
     glutSpecialFunc(on_keyboard_for_arrows);
     
-    glClearColor(0.75, 0.75, 0.75, 0);
+    glClearColor(0, 0.3, 0, 0);
     
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
@@ -83,9 +84,18 @@ static void on_display(void){
     
     glColor3f(0, 0, 1);
     
-    glTranslatef(x_curr, 0, -y_curr);
-    drawChicken();
+    glPushMatrix();
+        glTranslatef(x_curr, 0, -y_curr);
+        drawChicken();
+    glPopMatrix();
     
+    glPushMatrix();
+        glTranslatef(1, 0, 0);
+        drawTree();
+    glPopMatrix();
+        
+    drawCar();
+        
     glutSwapBuffers();
 }
 
@@ -180,7 +190,6 @@ static void initialize(void){
     y_curr = -1;
     
     points = 0;
-    
 }
 
 static void on_reshape(int width, int height){
@@ -198,18 +207,19 @@ static void on_timer(int value){
         animation_parameter += 1;
     
     if(animation_ongoing){
-        glutTimerFunc(TIMER_INTERVAL, on_timer, TIMER_ID);
+        glutTimerFunc(20, on_timer, TIMER_ID);
     }
 }
 
 static void checkAndStartTimer(){
+    
     if(!animation_ongoing){
         animation_ongoing = 1;
-        glutTimerFunc(TIMER_INTERVAL, on_timer, TIMER_ID);
+        glutTimerFunc(20, on_timer, TIMER_ID);
     }
 }
 
-void drawChicken(){ // funkcija za crtanje pileta
+void drawChicken(){
     
     rotateChicken(current_step);
     
@@ -299,4 +309,78 @@ static void rotateChicken(char current_step){
         glRotatef(180, 0, 1, 0);
 }
 
+static void drawTree(){
+    
+    glPushMatrix(); // stablo
+        glColor3f(0.4, 0.2, 0.1);
+        glScalef(0.8, 1.5, 0.8);
+        glutSolidCube(0.1);
+    glPopMatrix();
+    
+    glPushMatrix(); // krosnja
+        glColor3f(0.3, 0.5, 0.1);
+        glTranslatef(0, 0.1, 0);
+        glutSolidSphere(0.1, 30, 30);
+    glPopMatrix();
+}
 
+static void drawCar(){
+    
+    glPushMatrix(); // glavni donji deo
+        glColor3f(0, 0, 1);
+        glScalef(1, 0.25, 0.5);
+        glutSolidCube(0.2);
+    glPopMatrix();
+    
+    glPushMatrix(); // glavni gornji deo
+        glColor3f(0, 0, 0);
+        glScalef(1, 0.35, 0.5);
+        glTranslatef(0, 0.14, 0);
+        glutSolidCube(0.13);
+    glPopMatrix();
+    
+    glPushMatrix(); // zadnji desni tocak
+        glColor3f(0.1, 0.1, 0.1);
+        glTranslatef(-0.05, -0.025, 0.05);
+        glutSolidSphere(0.025, 30, 2);
+    glPopMatrix();
+    
+    glPushMatrix(); // zadnji levi tocak
+        glColor3f(0.1, 0.1, 0.1);
+        glTranslatef(-0.05, -0.025, -0.05);
+        glutSolidSphere(0.025, 30, 2);
+    glPopMatrix();
+    
+    glPushMatrix(); // prednji desni tocak
+        glColor3f(0.1, 0.1, 0.1);
+        glTranslatef(0.05, -0.025, 0.05);
+        glutSolidSphere(0.025, 30, 2);
+    glPopMatrix();
+    
+    glPushMatrix(); // prednji levi tocak
+        glColor3f(0.1, 0.1, 0.1);
+        glTranslatef(0.05, -0.025, -0.05);
+        glutSolidSphere(0.025, 30, 2);
+    glPopMatrix();
+    
+    glPushMatrix(); // sofersajbna
+        glColor3f(0.7, 0.7, 0.7);
+        glScalef(0.1, 0.25, 0.5);
+        glTranslatef(0.6, 0.2, 0);
+        glutSolidCube(0.11);
+    glPopMatrix();
+    
+    glPushMatrix(); // desni prozor
+        glColor3f(0.7, 0.7, 0.7);
+        glScalef(1, 0.25, 0.1);
+        glTranslatef(0, 0.19, -0.3);
+        glutSolidCube(0.09);
+    glPopMatrix();
+    
+    glPushMatrix(); // levi prozor
+        glColor3f(0.7, 0.7, 0.7);
+        glScalef(1, 0.25, 0.1);
+        glTranslatef(0, 0.19, 0.3);
+        glutSolidCube(0.09);
+    glPopMatrix();
+}
