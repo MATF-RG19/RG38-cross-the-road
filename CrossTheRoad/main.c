@@ -39,12 +39,13 @@ static void drawTree(); // funkcija koja crta drvo
 static void drawCar(); // funkcija koja crta automobil
 static void initialize_fields(); // funkcija koja inicijalizuje strukturu za polja
 
-static void setCar(); // postavlja automobil na odredjeno polje i postavlja vrednost polja na zauzeto
-static void setTree(); // postavlja drvo na odredjeno polje i postavlja vrednost polja na zauzeto
+static void setCar(int coordinate1, int coordinate2); // postavlja automobil na odredjeno polje i postavlja vrednost polja na zauzeto
+static void setTree(int coordinate1, int coordinate2); // postavlja drvo na odredjeno polje i postavlja vrednost polja na zauzeto
 
 static bool isFree(int coordinate1, int coordinate2); // proverava da li je slobodno polje na koje pile zeli da skoci
 
 #define TIMER_ID 0
+#define TIMER_INTERVAL 20
 
 typedef struct field_struct{
     bool taken;
@@ -112,8 +113,8 @@ static void on_display(void){
         drawChicken();
     glPopMatrix();
     
-    setCar();
-    setTree();
+    setCar(5, 6);
+    setTree(5, 8);
         
     glutSwapBuffers();
 }
@@ -137,8 +138,6 @@ static void on_keyboard(unsigned char key, int x, int y){
 
 static void on_keyboard_for_arrows(int key, int x, int y){
     
-    
-    /////////////////////////////////////////////////////// postavljamo reakcije na strelice
     switch(key){
         case GLUT_KEY_LEFT: 
             side = 'l';
@@ -157,7 +156,6 @@ static void on_keyboard_for_arrows(int key, int x, int y){
             jumpCheck(side);
             break;
     }
-    ////////////////////////////////////////////////////////
 }
 
 static void jumpCheck(unsigned char m){
@@ -228,9 +226,8 @@ static void on_timer(int value){
     if(value == TIMER_ID)
         animation_parameter += 1;
     
-    if(animation_ongoing){
+    if(animation_ongoing)
         glutTimerFunc(20, on_timer, TIMER_ID);
-    }
 }
 
 static void checkAndStartTimer(){
@@ -444,27 +441,28 @@ static void initialize_fields(){
     }
 }
 
-static void setCar(){
+static void setCar(int coordinate1, int coordinate2){
     
     glPushMatrix();
-        glTranslatef(field[5][6].middle_of_X, 0, field[5][6].middle_of_Z);
+        glTranslatef(field[coordinate1][coordinate2].middle_of_X, 0, field[coordinate1][coordinate2].middle_of_Z);
         drawCar();
     glPopMatrix();
     
-    field[5][6].taken = 1;
+    field[coordinate1][coordinate2].taken = 1;
 }
 
-static void setTree(){
+static void setTree(int coordinate1, int coordinate2){
     
     glPushMatrix();
-        glTranslatef(field[5][8].middle_of_X, 0, field[5][8].middle_of_Z);
+        glTranslatef(field[coordinate1][coordinate2].middle_of_X, 0, field[coordinate1][coordinate2].middle_of_Z);
         drawTree();
     glPopMatrix();
     
-    field[5][8].taken = 1;
+    field[coordinate1][coordinate2].taken = 1;
 }
 
 static bool isFree(int coordinate1, int coordinate2){
+    
     if(field[coordinate1][coordinate2].taken == 1)
         return 0;
     else
