@@ -18,11 +18,15 @@ const static float sizeX = 0.1275; // sirina pileta po x osi je 0.1275
 const static float vector = 0.2; // velicina za koju se pile krece
 static char side; // pravac i smer u kom se pomera pile (l || r || f || b)
 static char current_step = 0; // trenutni potez koji je ucinjen - treba nam zbog rotacije pileta kad se krece u stranu
+static int current_last_row = 19; // red polja nakon kog treba dodati novi red polja
 
 static int x_curr; // x koordinata pileta
 static int z_curr; // z koordinata pileta
 
 static int points; // trenutni broj poena (uvecava se za svako kretanje unapred)
+static int counter; // brojac koji treba da odluci kada pocinjemo sa dodavanjem novih polja
+static int jump_back_counter; // brojac skokova nazad (dozvoljeno 3 skoka unazad)
+static bool end; // istinitosna vrednost koja nam govori kada je kraj igre
 
 static void on_reshape(int width, int height); 
 static void on_display(void);
@@ -38,11 +42,11 @@ static void rotateChicken(char current_step); // funkcija koja rotira pile kad p
 static void drawTree(); // funkcija koja crta drvo
 static void drawCar(); // funkcija koja crta automobil
 static void initialize_fields(); // funkcija koja inicijalizuje strukturu za polja
-
 static void setCar(int coordinate1, int coordinate2); // postavlja automobil na odredjeno polje i postavlja vrednost polja na zauzeto
 static void setTree(int coordinate1, int coordinate2); // postavlja drvo na odredjeno polje i postavlja vrednost polja na zauzeto
-
 static bool isFree(int coordinate1, int coordinate2); // proverava da li je slobodno polje na koje pile zeli da skoci
+static void addRow(int i); // funkcija koja uklanja red polja sa pocetka i dodaje novi na kraj
+static int nextX(int currentI); // funkcija koja nam govori koji je sledeci indeks reda na koji mozemo da skocimo
 
 #define TIMER_ID 0
 #define TIMER_INTERVAL 20
@@ -53,7 +57,7 @@ typedef struct field_struct{
     float middle_of_X;
     float z_coordinate[2];
     float middle_of_Z;
-    char teren;
+    char surface; // tip podloge (moze biti trava 'g', asfalt 'a' i voda 'w')
 }field_struct;
 
 field_struct field[20][15];
@@ -179,9 +183,14 @@ static void jumpCheck(unsigned char m){
             glutPostRedisplay();
             break;
         case 'f':
-            if(isFree(x_curr + 1, z_curr)){
-                x_curr ++;
+            if(isFree(nextX(x_curr), z_curr)){
+                x_curr = nextX(x_curr);
                 points ++;
+                
+                if(counter < 5)
+                    counter ++;
+                else
+                    addRow(current_last_row == 19 ? 0 : current_last_row + 1);
             }
             current_step = 'f';
             checkAndStartTimer();
@@ -191,7 +200,11 @@ static void jumpCheck(unsigned char m){
         case 'b':
             if (x_curr > 0 && isFree(x_curr - 1, z_curr)){ // jer je na pocetku koordinata donje ivice pileta jednaka 1.08875
                 x_curr --;
-                printf("Points: %d\n", points);
+                counter --;
+                if(jump_back_counter < 3)
+                    jump_back_counter ++;
+                else
+                    end = 1;
             }
             current_step = 'b';
             checkAndStartTimer();
@@ -208,8 +221,10 @@ static void initialize(void){
     
     x_curr = 0;
     z_curr = 8;
-    
     points = 0;
+    counter = 0;
+    jump_back_counter = 0;
+    end = 0;
 }
 
 static void on_reshape(int width, int height){
@@ -467,4 +482,37 @@ static bool isFree(int coordinate1, int coordinate2){
         return 0;
     else
         return 1;
+}
+
+static void addRow(int i){
+    
+    current_last_row = i;
+    
+    // srand(time(NULL)); // za postavljanje drveca
+    
+    if(i != 0){
+        for (int j = 0; j < 15; j++){
+            field[i][j].x_coordinate[0] = field[i-1][j].x_coordinate[0];
+            field[i][j].x_coordinate[1] = field[i-1][j].x_coordinate[1];
+            field[i][j].z_coordinate[0] = field[i-1][j].z_coordinate[0] - vector;
+            field[i][j].z_coordinate[1] = field[i-1][j].z_coordinate[1] - vector;
+            field[i][j].middle_of_X = field[i][j].x_coordinate[0] + (field[i][j].x_coordinate[1] - field[i][j].x_coordinate[0]) / 2;
+            field[i][j].middle_of_Z = field[i][j].z_coordinate[0] + (field[i][j].z_coordinate[1] - field[i][j].z_coordinate[0]) / 2;
+        }
+    }
+    else{
+        for (int j = 0; j < 15; j++){
+            field[i][j].x_coordinate[0] = field[19][j].x_coordinate[0];
+            field[i][j].x_coordinate[1] = field[19][j].x_coordinate[1];
+            field[i][j].z_coordinate[0] = field[19][j].z_coordinate[0] - vector;
+            field[i][j].z_coordinate[1] = field[19][j].z_coordinate[1] - vector;
+            field[i][j].middle_of_X = field[i][j].x_coordinate[0] + (field[i][j].x_coordinate[1] - field[i][j].x_coordinate[0]) / 2;
+            field[i][j].middle_of_Z = field[i][j].z_coordinate[0] + (field[i][j].z_coordinate[1] - field[i][j].z_coordinate[0]) / 2;
+        }
+    }
+}
+
+static int nextX(int currentI){
+    
+    return currentI == 19 ? 0 : currentI + 1;
 }
