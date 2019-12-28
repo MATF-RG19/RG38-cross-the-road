@@ -5,23 +5,31 @@
 #include <time.h>
 #include <stdbool.h>
 
-static float animation_ongoing = 0;
-static float animation_parameter = 0;
+static bool animation_ongoing = 0; 
+static int animation_parameter = 0;
+
+static float jumping_parameter = 0; // parametar koji sluzi za animiranje skoka pileta
+static float jumping_active = 0; // govori nam da li je aktivno skakanje
+
+static float cars_parameter = 0;
 
 // koordinata prednje ivice pileta na pocetku z = 0.91125
 // koordinata zadnje ivice pileta na pocetku z = 1.08875
 // koordinata desne ivice pileta na pocetku x = 0.06375
 // koordinata leve ivice pileta na pocetku x = -0.06375
 
+static int currentCarID; // indeks prvog slobodnog automobila
+const static float surface_level = -0.085; // nivo gde se postavlja asfalt
 const static float sizeZ = 0.1775; // duzina pileta po z osi je 0.1775
 const static float sizeX = 0.1275; // sirina pileta po x osi je 0.1275
 const static float vector = 0.2; // velicina za koju se pile krece
 static char side; // pravac i smer u kom se pomera pile (l || r || f || b)
 static char current_step = 0; // trenutni potez koji je ucinjen - treba nam zbog rotacije pileta kad se krece u stranu
-static int current_last_row = 19; // red polja nakon kog treba dodati novi red polja
+static int current_last_row; // red polja nakon kog treba dodati novi red polja
+static int camera_position_z; // sluzi za pomeranje kamere
 
-static int x_curr; // x koordinata pileta
-static int z_curr; // z koordinata pileta
+static int x_curr; // indeks x koordinate pileta
+static int z_curr; // indeks z koordinate pileta
 
 static int points; // trenutni broj poena (uvecava se za svako kretanje unapred)
 static int counter; // brojac koji treba da odluci kada pocinjemo sa dodavanjem novih polja
@@ -32,34 +40,54 @@ static void on_reshape(int width, int height);
 static void on_display(void);
 static void on_keyboard(unsigned char key, int x, int y);
 static void on_timer(int value);
+static void jumping_timer(int value); // funkcija za animiranje skoka pileta
 
 static void on_keyboard_for_arrows(int key, int x, int y); // osluskivac za strelice
 static void initialize(void);
 static void jumpCheck(unsigned char m); // funkcija koja proverava da li je moguce kretanje u zadatom pravcu
-static void checkAndStartTimer(); // funkcija koja pokrece tajmer na prvi dodir nekog od tastera za kretanje
 static void drawChicken(); // funkcija za crtanje pileta
 static void rotateChicken(char current_step); // funkcija koja rotira pile kad pri promeni pravca ili smera kretanja
 static void drawTree(); // funkcija koja crta drvo
 static void drawCar(); // funkcija koja crta automobil
 static void initialize_fields(); // funkcija koja inicijalizuje strukturu za polja
-static void setCar(int coordinate1, int coordinate2); // postavlja automobil na odredjeno polje i postavlja vrednost polja na zauzeto
+static void initialize_cars(); // funkcija za inicijalizaciju automobila
+static void setCar(float coordinate1, float coordinate2); // postavlja automobil na odredjeno polje i postavlja vrednost polja na zauzeto
 static void setTree(int coordinate1, int coordinate2); // postavlja drvo na odredjeno polje i postavlja vrednost polja na zauzeto
+static void setAsphalt(int coordinate1, int coordinate2); // postavlja asfalt na pozicije gde se nalazi put
 static bool isFree(int coordinate1, int coordinate2); // proverava da li je slobodno polje na koje pile zeli da skoci
 static void addRow(int i); // funkcija koja uklanja red polja sa pocetka i dodaje novi na kraj
-static int nextX(int currentI); // funkcija koja nam govori koji je sledeci indeks reda na koji mozemo da skocimo
+static int nextX(int currentX); // funkcija koja nam govori koji je sledeci indeks reda na koji mozemo da skocimo
+static void updateRow(int i); // funkcija koja ubacuje drveca ili automobile na polja zadatog reda
+static void checkAndStartTimer(); // funkcija koja startuje timer kojim se menja glavni animacioni parametar
 
 #define TIMER_ID 0
 #define TIMER_INTERVAL 20
 
-typedef struct field_struct{
-    bool taken;
-    float x_coordinate[2];
-    float middle_of_X;
-    float z_coordinate[2];
-    float middle_of_Z;
-    char surface; // tip podloge (moze biti trava 'g', asfalt 'a' i voda 'w')
+#define JUMPING_TIMER_ID 1
+#define JUMPING_INTERVAL 1
+
+#define PI 3.14159265358979323846
+
+typedef struct field_struct{ 
+    bool taken; // oznacava da li je polje zauzeto (da li se na njemu nalazi drvo)
+    float x_coordinate[2]; // sadrzi informacije o levoj i desnoj granicnoj koordinati polja
+    float middle_of_X; // sadrzi informaciju o x koordinati sredista polja (da bi znali gde da postavimo drvo ili pile)
+    float z_coordinate[2]; // sadrzi informacije o donjoj i gornjoj granicnoj koordinati polja
+    float middle_of_Z; // sadrzi informaciju o z koordinati sredista polja (da bi znali gde da postavimo drvo ili pile)
+    char surface; // nosi podatak o tipu terena (trava ili asfalt)
 }field_struct;
 
+typedef struct cars{
+    bool active; // oznacava da li je automobil aktivan
+    int hisRow; // nosi informaciju o tome za koji red polja (prva koordinata iz field) je vezan taj automobil
+    char hisPosition; // nosi informaciju o tome da li automobil dolazi sa leve ili desne strane
+    float middle_of_X;
+    float hisLimit;
+    float middle_of_Z;
+    float x_coordinate[2];
+}cars;
+
+cars car[20];
 field_struct field[20][15];
 
 int main(int argc, char** argv){
@@ -82,6 +110,8 @@ int main(int argc, char** argv){
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glEnable(GL_COLOR_MATERIAL);
+    glEnable (GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     float light_position[] = {-1, 1, 1, 0};
     float light_ambient[] = {.3f, .3f, .3f, 1};
@@ -92,6 +122,9 @@ int main(int argc, char** argv){
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
+    
+    srand(time(NULL));
+    
     initialize();
     
     glutMainLoop();
@@ -106,19 +139,42 @@ static void on_display(void){
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     
-    gluLookAt(0, 3, 3,
-              0, 0, 0,
+    gluLookAt(0, 3, 3 - 0.2 * camera_position_z,
+              0, 0, field[x_curr][z_curr].middle_of_Z,
               0, 1, 0);
     
     glColor3f(0, 0, 1);
     
     glPushMatrix();
-        glTranslatef(field[x_curr][z_curr].middle_of_X, 0, field[x_curr][z_curr].middle_of_Z);
+        glTranslatef(field[x_curr][z_curr].middle_of_X, 0 + sin((jumping_parameter) * PI)/50.0, field[x_curr][z_curr].middle_of_Z);
         drawChicken();
     glPopMatrix();
     
-    setCar(5, 6);
-    setTree(5, 8);
+    cars_parameter = animation_parameter % 150 / 150.0;
+    
+    for(int i = 0; i < 20; i++){
+        if(field[i][0].surface == 'a'){
+            for(int k = 0; k < 20; k++){
+                if(car[k].active == 1 && car[k].hisRow == i){
+                    if(car[k].hisPosition == 'l')
+                        setCar(car[k].middle_of_X + (car[k].hisLimit - car[k].middle_of_X) * cars_parameter, car[k].middle_of_Z);
+                    if(car[k].hisPosition == 'r')
+                        setCar(car[k].middle_of_X + (car[k].hisLimit - car[k].middle_of_X) * cars_parameter, car[k].middle_of_Z);
+                }
+            }
+        }
+        for(int j = 0; j < 15; j++){
+            if(field[i][j].taken == 1 && field[i][j].surface == 'g')
+                setTree(i, j);
+            else if(field[i][j].surface == 'a'){
+                setAsphalt(i, j);
+            }
+        }
+    }
+    for (int i = 0; i < 20; i++){
+        if(car[i].active == 1 && car[i].hisRow == x_curr && car[i].x_coordinate[0] + (car[i].hisLimit - car[i].middle_of_X) * cars_parameter < field[x_curr][z_curr].middle_of_X + sizeX / 2 && car[i].x_coordinate[1] + (car[i].hisLimit - car[i].middle_of_X) * cars_parameter > field[x_curr][z_curr].middle_of_X - sizeX / 2 && car[i].middle_of_Z == field[x_curr][z_curr].middle_of_Z) 
+            exit(1); // umesto ovoga obradi situaciju kada kola zgaze pile
+    }
         
     glutSwapBuffers();
 }
@@ -130,19 +186,19 @@ static void on_keyboard(unsigned char key, int x, int y){
         case 27: // Esc
             exit(0);
             break;
-        case 'q':
-        case 'Q':
-            animation_ongoing = 0;
-        case 'r':
-        case 'R':
-            animation_parameter = 0;
-            glutPostRedisplay();
+        case 'g':
+        case 'G':
+            if(!animation_ongoing){
+                animation_ongoing = 1;
+                glutTimerFunc(TIMER_INTERVAL, on_timer, TIMER_ID);
+            }break;
     }
 }
 
 static void on_keyboard_for_arrows(int key, int x, int y){
     
-    switch(key){
+    // if(animation_parameter > 100){
+        switch(key){
         case GLUT_KEY_LEFT: 
             side = 'l';
             jumpCheck(side);
@@ -159,7 +215,9 @@ static void on_keyboard_for_arrows(int key, int x, int y){
             side = 'b';
             jumpCheck(side);
             break;
-    }
+        }
+    //}
+    checkAndStartTimer();
 }
 
 static void jumpCheck(unsigned char m){
@@ -169,21 +227,26 @@ static void jumpCheck(unsigned char m){
         case 'l':
             if (z_curr > 0 && isFree(x_curr, z_curr - 1)){
                 z_curr --;
+                
+                jumping_active = 1;
+                glutTimerFunc(JUMPING_INTERVAL, jumping_timer, JUMPING_TIMER_ID);
             }
             current_step = 'l';
-            checkAndStartTimer();
             glutPostRedisplay();
             break;
         case 'r':
             if (z_curr < 14 && isFree(x_curr, z_curr + 1)){
                 z_curr ++;
+                
+                jumping_active = 1;
+                glutTimerFunc(JUMPING_INTERVAL, jumping_timer, JUMPING_TIMER_ID);
             }
             current_step = 'r';
-            checkAndStartTimer();
             glutPostRedisplay();
             break;
         case 'f':
             if(isFree(nextX(x_curr), z_curr)){
+                camera_position_z ++;
                 x_curr = nextX(x_curr);
                 points ++;
                 
@@ -191,9 +254,11 @@ static void jumpCheck(unsigned char m){
                     counter ++;
                 else
                     addRow(current_last_row == 19 ? 0 : current_last_row + 1);
+                
+                jumping_active = 1;
+                glutTimerFunc(JUMPING_INTERVAL, jumping_timer, JUMPING_TIMER_ID);
             }
             current_step = 'f';
-            checkAndStartTimer();
             glutPostRedisplay();
             printf("Points: %d\n", points);
             break;
@@ -203,11 +268,14 @@ static void jumpCheck(unsigned char m){
                 counter --;
                 if(jump_back_counter < 3)
                     jump_back_counter ++;
-                else
-                    end = 1;
+                else{ // dozvoljeno je samo 3 kretanja unazad, stoga je igra zavrsena
+                    exit(1);
+                }
+                
+                jumping_active = 1;
+                glutTimerFunc(JUMPING_INTERVAL, jumping_timer, JUMPING_TIMER_ID);
             }
             current_step = 'b';
-            checkAndStartTimer();
             glutPostRedisplay();
             break;
     }
@@ -218,13 +286,20 @@ static void jumpCheck(unsigned char m){
 static void initialize(void){
     
     initialize_fields();
+    initialize_cars();
     
     x_curr = 0;
-    z_curr = 8;
+    z_curr = 7;
     points = 0;
     counter = 0;
     jump_back_counter = 0;
     end = 0;
+    current_last_row = 19;
+    camera_position_z = 0;
+    currentCarID = 0;
+    
+    for(int i = 3; i < 20; i++)
+        updateRow(i);
 }
 
 static void on_reshape(int width, int height){
@@ -234,23 +309,36 @@ static void on_reshape(int width, int height){
     glLoadIdentity();
 
     gluPerspective(30, (float) width/height, 1, 1000);
+    
+    glutFullScreen();
 }
-
 static void on_timer(int value){
     
-    if(value == TIMER_ID)
-        animation_parameter += 1;
+    if(value != TIMER_ID)
+        return;
+    
+    animation_parameter += 1;
+     
+    glutPostRedisplay();     
     
     if(animation_ongoing)
-        glutTimerFunc(20, on_timer, TIMER_ID);
+        glutTimerFunc(TIMER_INTERVAL, on_timer, TIMER_ID);
 }
 
-static void checkAndStartTimer(){
+static void jumping_timer(int value){
     
-    if(!animation_ongoing){
-        animation_ongoing = 1;
-        glutTimerFunc(20, on_timer, TIMER_ID);
+    if(value != JUMPING_TIMER_ID)
+        return;
+    
+    jumping_parameter += 0.05;
+    
+    if(jumping_parameter >= 1){
+        jumping_parameter = 0;
+        jumping_active = 0;
     }
+    
+    if(jumping_active)
+        glutTimerFunc(JUMPING_INTERVAL, jumping_timer, JUMPING_TIMER_ID);
 }
 
 void drawChicken(){
@@ -456,14 +544,14 @@ static void initialize_fields(){
     }
 }
 
-static void setCar(int coordinate1, int coordinate2){
+static void setCar(float coordinate1, float coordinate2){
     
     glPushMatrix();
-        glTranslatef(field[coordinate1][coordinate2].middle_of_X, 0, field[coordinate1][coordinate2].middle_of_Z);
+        glTranslatef(coordinate1, 0, coordinate2);
         drawCar();
     glPopMatrix();
     
-    field[coordinate1][coordinate2].taken = 1;
+//     field[coordinate1][coordinate2].taken = 1;
 }
 
 static void setTree(int coordinate1, int coordinate2){
@@ -472,8 +560,16 @@ static void setTree(int coordinate1, int coordinate2){
         glTranslatef(field[coordinate1][coordinate2].middle_of_X, 0, field[coordinate1][coordinate2].middle_of_Z);
         drawTree();
     glPopMatrix();
+}
+
+static void setAsphalt(int coordinate1, int coordinate2){
     
-    field[coordinate1][coordinate2].taken = 1;
+    glPushMatrix();
+        glColor3f(0.02, 0.02, 0.02);
+        glTranslatef(field[coordinate1][coordinate2].middle_of_X, surface_level, field[coordinate1][coordinate2].middle_of_Z);
+        glScalef(1, 0.05, 1);
+        glutSolidCube(0.2);
+    glPopMatrix();
 }
 
 static bool isFree(int coordinate1, int coordinate2){
@@ -488,8 +584,6 @@ static void addRow(int i){
     
     current_last_row = i;
     
-    // srand(time(NULL)); // za postavljanje drveca
-    
     if(i != 0){
         for (int j = 0; j < 15; j++){
             field[i][j].x_coordinate[0] = field[i-1][j].x_coordinate[0];
@@ -498,6 +592,8 @@ static void addRow(int i){
             field[i][j].z_coordinate[1] = field[i-1][j].z_coordinate[1] - vector;
             field[i][j].middle_of_X = field[i][j].x_coordinate[0] + (field[i][j].x_coordinate[1] - field[i][j].x_coordinate[0]) / 2;
             field[i][j].middle_of_Z = field[i][j].z_coordinate[0] + (field[i][j].z_coordinate[1] - field[i][j].z_coordinate[0]) / 2;
+            field[i][j].taken = 0;
+            field[i][j].surface = 0;
         }
     }
     else{
@@ -508,11 +604,74 @@ static void addRow(int i){
             field[i][j].z_coordinate[1] = field[19][j].z_coordinate[1] - vector;
             field[i][j].middle_of_X = field[i][j].x_coordinate[0] + (field[i][j].x_coordinate[1] - field[i][j].x_coordinate[0]) / 2;
             field[i][j].middle_of_Z = field[i][j].z_coordinate[0] + (field[i][j].z_coordinate[1] - field[i][j].z_coordinate[0]) / 2;
+            field[i][j].taken = 0;
+            field[i][j].surface = 0;
+        }
+    }
+    
+    updateRow(i);
+}
+
+static void updateRow(int i){
+    
+    int surfaceType = rand()%10 > 4 ? 'g' : 'a';
+    
+    if(surfaceType == 'g'){
+        field[i][0].taken = 1;
+        field[i][1].taken = 1;
+        field[i][13].taken = 1;
+        field[i][14].taken = 1;
+        
+        field[i][0].surface = 'g';
+        field[i][1].surface = 'g';
+        field[i][2].surface = 'g';
+        field[i][12].surface = 'g';
+        field[i][13].surface = 'g';
+        field[i][14].surface = 'g';
+        
+        for (int j = 2; j < 13; j++){
+            if(rand()%10 < 2){
+                field[i][j].taken = 1;
+                field[i][j].surface = 'g';
+            }
+        }
+    }
+    
+    if(surfaceType == 'a'){
+        if(currentCarID == 19)
+            currentCarID = 0;
+        car[currentCarID].hisRow = i;
+        car[currentCarID].hisPosition = rand()%10 > 4 ? 'l' : 'r';
+        if(car[currentCarID].hisPosition == 'l')
+            car[currentCarID].middle_of_X = field[i][0].middle_of_X - rand()%10/5.0;
+        else
+            car[currentCarID].middle_of_X = field[i][14].middle_of_X + rand()%10/10.0;
+        car[currentCarID].hisLimit = -1 * car[currentCarID].middle_of_X;
+        car[currentCarID].middle_of_Z = field[i][0].middle_of_Z;
+        car[currentCarID].x_coordinate[0] = car[currentCarID].middle_of_X - 0.1;
+        car[currentCarID].x_coordinate[1] = car[currentCarID].middle_of_X + 0.1;
+        car[currentCarID].active = 1;
+        currentCarID ++;
+        
+        for(int j = 0; j < 15; j++){
+            field[i][j].surface = 'a';
         }
     }
 }
 
-static int nextX(int currentI){
-    
-    return currentI == 19 ? 0 : currentI + 1;
+static int nextX(int currentX){
+    return currentX == 19 ? 0 : currentX + 1;
+}
+
+static void initialize_cars(){
+    for(int i = 0; i < 20; i++){
+        car[i].active = 0;
+    }
+}
+
+static void checkAndStartTimer(){
+    if(!animation_ongoing){
+        animation_ongoing = 1;
+        glutTimerFunc(TIMER_INTERVAL, on_timer, TIMER_ID);
+    }
 }
