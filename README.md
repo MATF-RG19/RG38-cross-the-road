@@ -15,7 +15,7 @@ Ideja zasnovana na igri Crossy Road. Pile se krece napred, nazad, levo i desno p
 ### Pokretanje igre:
 ```shell
 git clone https://github.com/MATF-RG19/RG38-cross-the-road
-cd RG171-my-bbtan/CrossTheRoad
+cd RG38-cross-the-road/CrossTheRoad
 ```
 * Pokrenite Makefile `make` <br>
 * Pokrenite igricu komandom `./cross_the_road`
