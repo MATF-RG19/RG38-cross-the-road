@@ -11,10 +11,14 @@ Ideja zasnovana na igri Crossy Road. Pile se krece napred, levo i desno prelazec
 <kbd>↑</kbd> / <kbd>→</kbd> / <kbd>←</kbd> Pocetak igre <br>
 <kbd>ESC</kbd> Izlaz iz igrice
 
-### Pokretanje igre:
+### Instalacija igre
+Pomocu terminala zadati komandu za kloniranje i pozicionirati se u folder kao sto je prikazano u nastavku.
 ```shell
 git clone https://github.com/MATF-RG19/RG38-cross-the-road
 cd RG38-cross-the-road/CrossTheRoad
 ```
-* Pokrenite Makefile `make` <br>
+
+### Pokretanje igre:
+
+* Pokrenite Makefile komandom `make` <br>
 * Pokrenite igricu komandom `./cross_the_road`
