@@ -234,6 +234,11 @@ static void on_keyboard(unsigned char key, int x, int y){
         case 27: // Esc
             exit(0);
             break;
+        case 'q': // na q ili Q mozemo da prekinemo igru (u slucaju da se zaglavimo i da ne mozemo nastaviti kretanje ni u jednom od 3 dozvoljena pravca)
+        case 'Q':
+            end = 1;
+            glutPostRedisplay();
+            break;
     }
 }
 
