@@ -8,7 +8,7 @@ Ideja zasnovana na igri Crossy Road. Pile se krece napred, levo i desno prelazec
 <kbd>↑</kbd> Kretanje unapred <br>
 <kbd>→</kbd> Kretanje udesno <br>
 <kbd>←</kbd> Kretanje ulevo <br>
-<kbd>q</kbd> / <kbd>Q</kbd> Zavrsavanje / Prekidanje igre <br>
+<kbd>q</kbd> / <kbd>Q</kbd> Zavrsavanje - prekidanje igre <br>
 <kbd>↑</kbd> / <kbd>→</kbd> / <kbd>←</kbd> Pocetak igre <br>
 <kbd>ESC</kbd> Izlaz iz igrice
 
