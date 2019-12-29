@@ -185,7 +185,7 @@ static void on_display(void){
     glPopMatrix();
     
     glPushMatrix();
-        glTranslatef(field[x_curr][z_curr].middle_of_X, 0 + sin((jumping_parameter) * PI)/50.0, field[x_curr][z_curr].middle_of_Z);
+        glTranslatef(field[x_curr][z_curr].middle_of_X, 0 + sin((jumping_parameter) * PI)/25.0, field[x_curr][z_curr].middle_of_Z);
         drawChicken();
     glPopMatrix();
     
